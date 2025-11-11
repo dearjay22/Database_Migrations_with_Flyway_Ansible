@@ -1,0 +1,55 @@
+name: CI with Flyway & Ansible
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  ci-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Bring environment up (Ansible up.yml)
+        run: |
+          ansible-playbook ansible/up.yml
+
+      - name: Run incremental Flyway migrations
+        run: |
+          docker run --rm --network host \
+            -v ${{ github.workspace }}/flyway/migrations_incremental:/flyway/sql \
+            flyway/flyway:10 \
+            -url=jdbc:mysql://127.0.0.1:3306/subscriptions \
+            -user=sub_user -password=sub_pass \
+            migrate
+
+      - name: Run CRUD tests
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: sub_user
+          DB_PASSWORD: sub_pass
+          DB_NAME: subscriptions
+        run: |
+          pytest -v tests/test_subscribers.py
+
+      - name: Tear down environment (Ansible down.yml)
+        if: always()
+        run: |
+          ansible-playbook ansible/down.yml
+
+      - name: Print completion message
+        run: echo "Deployment done for commit ${{ github.sha }}"
