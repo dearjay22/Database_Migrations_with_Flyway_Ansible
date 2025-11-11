@@ -1,24 +1,38 @@
-
 ---
 - name: Assignment 4 - Bring environment up and run initial migrations
   hosts: localhost
   connection: local
   vars:
-    mysql_root_password: "rootpass"
-    db_name: "subscriptions"
-    db_user: "sub_user"
-    db_pass: "sub_pass"
-    mysql_host: "127.0.0.1"
-    mysql_port: 3306
+    mysql_root_password: rootpass
+    db_name: subscriptions
+    db_user: appuser
+    db_pass: apppass
+
   tasks:
     - name: Ensure MySQL container is running (docker)
       ansible.builtin.shell: |
-        docker inspect a4-mysql >/dev/null 2>&1 ||         docker run --name a4-mysql -e MYSQL_ROOT_PASSWORD={{ mysql_root_password }} -e MYSQL_DATABASE={{ db_name }} -p {{ mysql_port }}:3306 -d mysql:8
+        docker ps --filter "name=a4-mysql" --filter "status=running" --format "{{ '{{' }}.Names{{ '}}' }}" | grep -q a4-mysql \
+        || docker run -d --name a4-mysql \
+            -e MYSQL_ROOT_PASSWORD={{ mysql_root_password }} \
+            -e MYSQL_DATABASE={{ db_name }} \
+            -p 3306:3306 \
+            mysql:8.0
       changed_when: false
 
     - name: Wait for MySQL to be healthy
       ansible.builtin.shell: |
-        until docker exec a4-mysql mysqladmin ping -p{{ mysql_root_password }} --silent; do sleep 2; done
+        echo "Waiting for MySQL container to become healthy..."
+        until docker exec a4-mysql mysqladmin ping -h "localhost" -p{{ mysql_root_password }} --silent; do
+          sleep 3
+        done
+      changed_when: false
+
+    - name: Wait until MySQL root can connect to database
+      ansible.builtin.shell: |
+        until docker exec a4-mysql mysql -uroot -p{{ mysql_root_password }} -e "SELECT 1" >/dev/null 2>&1; do
+          echo "Waiting for MySQL to be ready..."
+          sleep 3
+        done
       changed_when: false
 
     - name: Create DB user with limited privileges
@@ -29,8 +43,14 @@
           FLUSH PRIVILEGES;"
       changed_when: false
 
-    - name: Run initial Flyway migrations (Docker)
+    - name: Run initial Flyway migrations
       ansible.builtin.shell: |
-        docker run --rm --network host -v {{ playbook_dir }}/../flyway:/flyway/sql flyway/flyway:10           -url=jdbc:mysql://{{ mysql_host }}:{{ mysql_port }}/{{ db_name }}           -user={{ db_user }} -password={{ db_pass }}           -locations=filesystem:/flyway/migrations_initial migrate
-      args:
-        chdir: "{{ playbook_dir }}/.."
+        docker run --rm \
+          --network host \
+          -v ${{ github.workspace }}/sql:/flyway/sql \
+          flyway/flyway:9.22.2 \
+          -url=jdbc:mysql://localhost:3306/{{ db_name }} \
+          -user={{ db_user }} \
+          -password={{ db_pass }} \
+          migrate
+      changed_when: false
