@@ -46,23 +46,11 @@
       changed_when: false
 
     - name: Run initial Flyway migrations
-      ansible.builtin.shell: |
-        docker run --rm --network host \
-          -v {{ playbook_dir }}/../flyway/migrations_initial:/flyway/sql \
-          flyway/flyway:10 \
-          -url=jdbc:mysql://{{ mysql_host }}:{{ mysql_port }}/{{ db_name }}?allowPublicKeyRetrieval=true&useSSL=false \
-          -user={{ db_user }} \
-          -password={{ db_pass }} \
-          migrate
+      ansible.builtin.shell: >
+        docker run --rm --network host -v {{ playbook_dir }}/../flyway/migrations_initial:/flyway/sql flyway/flyway:10 -url=jdbc:mysql://{{ mysql_host }}:{{ mysql_port }}/{{ db_name }}?allowPublicKeyRetrieval=true&useSSL=false -user={{ db_user }} -password={{ db_pass }} migrate
       changed_when: false
 
     - name: Run incremental Flyway migrations
-      ansible.builtin.shell: |
-        docker run --rm --network host \
-          -v {{ playbook_dir }}/../flyway/migrations_incremental:/flyway/sql \
-          flyway/flyway:10 \
-          -url=jdbc:mysql://{{ mysql_host }}:{{ mysql_port }}/{{ db_name }}?allowPublicKeyRetrieval=true&useSSL=false \
-          -user={{ db_user }} \
-          -password={{ db_pass }} \
-          migrate
+      ansible.builtin.shell: >
+        docker run --rm --network host -v {{ playbook_dir }}/../flyway/migrations_incremental:/flyway/sql flyway/flyway:10 -url=jdbc:mysql://{{ mysql_host }}:{{ mysql_port }}/{{ db_name }}?allowPublicKeyRetrieval=true&useSSL=false -user={{ db_user }} -password={{ db_pass }} migrate
       changed_when: false
