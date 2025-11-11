@@ -33,14 +33,14 @@
       ansible.builtin.shell: |
         until docker exec a4-mysql mysql -uroot -p{{ mysql_root_password }} -e "SELECT 1" >/dev/null 2>&1; do
           echo "Waiting for MySQL to be ready..."
-          sleep 3
+          sleep 5
         done
       changed_when: false
 
     - name: Create DB user with limited privileges
       ansible.builtin.shell: |
         docker exec -i a4-mysql mysql -uroot -p{{ mysql_root_password }} -e "
-          CREATE USER IF NOT EXISTS '{{ db_user }}'@'%' IDENTIFIED BY '{{ db_pass }}';
+          CREATE USER IF NOT EXISTS '{{ db_user }}'@'%' IDENTIFIED WITH mysql_native_password BY '{{ db_pass }}';
           GRANT ALL PRIVILEGES ON {{ db_name }}.* TO '{{ db_user }}'@'%';
           FLUSH PRIVILEGES;"
       changed_when: false
