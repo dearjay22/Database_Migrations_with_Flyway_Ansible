@@ -9,8 +9,6 @@ on:
 jobs:
   ci-pipeline:
     runs-on: ubuntu-latest
-    env:
-      ANSIBLE_COLLECTIONS_PATHS: ~/.ansible/collections
 
     steps:
       - name: Checkout code
@@ -41,13 +39,9 @@ jobs:
           DB_PASSWORD: sub_pass
           DB_NAME: subscriptions
         run: |
-          # wait a few seconds to ensure DB is ready
           sleep 5
           pytest -v tests/test_subscribers.py
 
       - name: Tear down environment (Ansible down.yml)
         if: always()
         run: ansible-playbook ansible/down.yml -e "ansible_python_interpreter=/usr/bin/python3"
-
-      - name: Print completion message
-        run: echo "CI pipeline completed for commit ${{ github.sha }}"
