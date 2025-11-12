@@ -67,7 +67,7 @@ To integrate Flyway and Liquibase into a CI/CD pipeline:
    - Store migration history and audit logs
 
 
-![alt text](image-7.png)
+![Flow_Chart](image-7.png)
 ---
 
 ## References
