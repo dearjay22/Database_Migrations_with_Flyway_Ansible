@@ -1,64 +1,79 @@
-name: CI with Flyway & Python
+name: Flyway Migration, Ansible and Test CI
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   pull_request:
-    branches: [ main ]
 
 jobs:
-  ci-pipeline:
+  test:
     runs-on: ubuntu-latest
+
+    # MySQL service provided by GitHub Actions
     services:
       mysql:
-        image: mysql:8.0
+        image: mysql:8
         env:
           MYSQL_ROOT_PASSWORD: rootpass
           MYSQL_DATABASE: subscriptions
-          MYSQL_USER: sub_user
-          MYSQL_PASSWORD: sub_pass
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping --silent"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+          --health-cmd="mysqladmin ping -uroot -prootpass" 
+          --health-interval=5s 
+          --health-timeout=2s 
+          --health-retries=12
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: root
+      DB_PASSWORD: rootpass
+      DB_NAME: subscriptions
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: 3.11
 
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pymysql pytest
+          pip install -r requirements.txt
 
       - name: Wait for MySQL to be ready
         run: |
           for i in {1..30}; do
-            mysqladmin ping -h 127.0.0.1 -P 3306 -uroot -prootpass &>/dev/null && break
+            mysql -h 127.0.0.1 -uroot -prootpass -e "SELECT 1" && break
             echo "Waiting for MySQL..."
             sleep 2
           done
 
-      - name: Run Flyway migrations
-        run: ansible-playbook ansible/up.yml
-
-      - name: Run CRUD tests
-        env:
-          DB_HOST: 127.0.0.1
-          DB_USER: sub_user
-          DB_PASSWORD: sub_pass
-          DB_NAME: subscriptions
+      - name: Create test user for Flyway migrations
         run: |
-          sleep 5
-          pytest -v tests/test_subscribers.py
+          mysql -h 127.0.0.1 -uroot -prootpass -e "
+          CREATE USER IF NOT EXISTS 'sub_user'@'%' IDENTIFIED BY 'sub_pass';
+          GRANT ALL PRIVILEGES ON subscriptions.* TO 'sub_user'@'%';
+          FLUSH PRIVILEGES;"
+
+      - name: Run Flyway migrations
+        run: |
+          docker run --rm --network host \
+            -v ${{ github.workspace }}/flyway:/flyway/sql \
+            flyway/flyway:10 \
+            -url=jdbc:mysql://127.0.0.1:3306/subscriptions \
+            -user=sub_user -password=sub_pass \
+            -locations=filesystem:/flyway/migrations_initial migrate
+
+      - name: Run Python tests
+        run: pytest -v test_subscribers.py
+
+      - name: Deployment complete
+        run: echo "Deployment and tests completed successfully!"
 
       - name: Completion message
         run: echo "CI pipeline completed for commit ${{ github.sha }}"
