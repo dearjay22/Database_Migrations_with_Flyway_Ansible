@@ -48,15 +48,7 @@ jobs:
           done
 
       - name: Run Flyway migrations
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}/flyway/migrations:/flyway/sql \
-            --network host \
-            flyway/flyway:10 \
-            -url=jdbc:mysql://127.0.0.1:3306/subscriptions?allowPublicKeyRetrieval=true&useSSL=false \
-            -user=root \
-            -password=rootpass \
-            migrate
+        run: ansible-playbook ansible/up.yml
 
       - name: Run CRUD tests
         env:

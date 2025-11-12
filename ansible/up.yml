@@ -14,34 +14,6 @@
     flyway_incr_path: ../flyway/migrations_incremental
 
   tasks:
-    - name: Start MySQL container
-      community.docker.docker_container:
-        name: "{{ mysql_container_name }}"
-        image: mysql:8.0
-        state: started
-        restart_policy: unless-stopped
-        ports:
-          - "{{ mysql_port }}:3306"
-        env:
-          MYSQL_ROOT_PASSWORD: "{{ mysql_root_password }}"
-
-    - name: Wait until MySQL is ready (TCP)
-      wait_for:
-        host: 127.0.0.1
-        port: "{{ mysql_port }}"
-        delay: 5
-        timeout: 30
-        state: started
-
-    - name: Create database and user
-      ansible.builtin.shell: |
-        docker exec -i {{ mysql_container_name }} mysql -h127.0.0.1 -uroot -p{{ mysql_root_password }} -e "
-        CREATE DATABASE IF NOT EXISTS {{ db_name }};
-        CREATE USER IF NOT EXISTS '{{ db_user }}'@'%' IDENTIFIED BY '{{ db_pass }}';
-        GRANT ALL PRIVILEGES ON {{ db_name }}.* TO '{{ db_user }}'@'%';
-        FLUSH PRIVILEGES;"
-      changed_when: true
-
     - name: Run initial Flyway migrations
       ansible.builtin.shell: |
         docker run --rm --network host \
