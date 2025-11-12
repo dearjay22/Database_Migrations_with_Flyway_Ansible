@@ -1,37 +1,38 @@
 #!/bin/bash
 set -e
 
-echo "Ensuring MySQL container is running..."
-docker ps --filter "name=a4-mysql" --filter "status=running" --format "{{.Names}}" | grep -q a4-mysql \
-  || docker run -d --name a4-mysql -e MYSQL_ROOT_PASSWORD=rootpass -e MYSQL_DATABASE=subscriptions -p 3306:3306 mysql:8
+# DB credentials
+DB_NAME="subscriptions"
+DB_USER="root"
+DB_PASS="rootpass"
 
-echo "Waiting for MySQL to be ready..."
-until docker exec a4-mysql mysqladmin ping -h "localhost" -prootpass --silent; do
-  sleep 3
+echo "Waiting for MySQL service to be ready..."
+until mysql -h host.docker.internal -P 3306 -u${DB_USER} -p${DB_PASS} -e "SELECT 1" >/dev/null 2>&1; do
+    echo "MySQL is not ready yet... waiting 3s"
+    sleep 3
 done
 echo "MySQL is ready!"
 
-echo "Creating DB user with default authentication..."
-docker exec -i a4-mysql mysql -uroot -prootpass -e "
-DROP USER IF EXISTS 'sub_user'@'%';
-CREATE USER 'sub_user'@'%' IDENTIFIED BY 'sub_pass';
-GRANT ALL PRIVILEGES ON subscriptions.* TO 'sub_user'@'%';
-FLUSH PRIVILEGES;"
-
+# Run initial Flyway migrations
 echo "Running initial Flyway migrations..."
-docker run --rm -v $(pwd)/flyway:/flyway/sql --network host flyway/flyway:10 \
-  -url=jdbc:mysql://localhost:3306/subscriptions \
-  -user=root \
-  -password=rootpass \
-  -locations=filesystem:/flyway/migrations_initial \
+docker run --rm \
+  -v $GITHUB_WORKSPACE/flyway/migrations_initial:/flyway/sql \
+  flyway/flyway:10 \
+  -url=jdbc:mysql://host.docker.internal:3306/${DB_NAME} \
+  -user=${DB_USER} \
+  -password=${DB_PASS} \
+  -locations=filesystem:/flyway/sql \
   migrate
 
+# Run incremental Flyway migrations
 echo "Running incremental Flyway migrations..."
-docker run --rm -v $(pwd)/flyway:/flyway/sql --network host flyway/flyway:10 \
-  -url=jdbc:mysql://localhost:3306/subscriptions \
-  -user=root \
-  -password=rootpass \
-  -locations=filesystem:/flyway/migrations_incremental \
+docker run --rm \
+  -v $GITHUB_WORKSPACE/flyway/migrations_incremental:/flyway/sql \
+  flyway/flyway:10 \
+  -url=jdbc:mysql://host.docker.internal:3306/${DB_NAME} \
+  -user=${DB_USER} \
+  -password=${DB_PASS} \
+  -locations=filesystem:/flyway/sql \
   migrate
 
 echo "Flyway migrations completed!"

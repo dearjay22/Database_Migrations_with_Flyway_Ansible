@@ -1,4 +1,4 @@
-name: CI with Flyway & Ansible
+name: CI with Flyway & Python tests
 
 on:
   push:
@@ -10,8 +10,22 @@ jobs:
   ci-pipeline:
     runs-on: ubuntu-latest
 
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: rootpass
+          MYSQL_DATABASE: subscriptions
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=5s
+          --health-timeout=10s
+          --health-retries=10
+
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -24,29 +38,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Bring environment up (Ansible up.yml)
-        run: ansible-playbook ansible/up.yml
-
       - name: Make migration script executable
         run: chmod +x ./ci_migrate.sh
 
-      - name: Run CI migrations script
+      - name: Run migrations
         run: ./ci_migrate.sh
 
       - name: Run CRUD tests
         env:
-          DB_HOST: 127.0.0.1
-          DB_USER: sub_user
-          DB_PASSWORD: sub_pass
+          DB_HOST: host.docker.internal
+          DB_USER: root
+          DB_PASSWORD: rootpass
           DB_NAME: subscriptions
         run: |
-          # Wait a moment for everything to settle
           sleep 5
           pytest -v tests/test_subscribers.py
-
-      - name: Tear down environment (Ansible down.yml)
-        if: always()
-        run: ansible-playbook ansible/down.yml
-
-      - name: Print completion message
-        run: echo "CI pipeline completed for commit ${{ github.sha }}"
