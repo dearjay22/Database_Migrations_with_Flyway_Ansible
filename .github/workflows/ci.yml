@@ -1,4 +1,4 @@
-name: CI with Flyway & Ansible
+name: CI with Flyway & Python
 
 on:
   push:
@@ -9,6 +9,21 @@ on:
 jobs:
   ci-pipeline:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpass
+          MYSQL_DATABASE: subscriptions
+          MYSQL_USER: sub_user
+          MYSQL_PASSWORD: sub_pass
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
       - name: Checkout code
@@ -22,11 +37,26 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install ansible docker community.docker
+          pip install pymysql pytest
 
-      - name: Bring environment up (Ansible up.yml)
-        run: ansible-playbook ansible/up.yml -e "ansible_python_interpreter=/usr/bin/python3"
+      - name: Wait for MySQL to be ready
+        run: |
+          for i in {1..30}; do
+            mysqladmin ping -h 127.0.0.1 -P 3306 -uroot -prootpass &>/dev/null && break
+            echo "Waiting for MySQL..."
+            sleep 2
+          done
+
+      - name: Run Flyway migrations
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}/flyway/migrations:/flyway/sql \
+            --network host \
+            flyway/flyway:10 \
+            -url=jdbc:mysql://127.0.0.1:3306/subscriptions?allowPublicKeyRetrieval=true&useSSL=false \
+            -user=root \
+            -password=rootpass \
+            migrate
 
       - name: Run CRUD tests
         env:
@@ -38,9 +68,5 @@ jobs:
           sleep 5
           pytest -v tests/test_subscribers.py
 
-      - name: Tear down environment (Ansible down.yml)
-        if: always()
-        run: ansible-playbook ansible/down.yml -e "ansible_python_interpreter=/usr/bin/python3"
-
-      - name: Print completion message
+      - name: Completion message
         run: echo "CI pipeline completed for commit ${{ github.sha }}"
