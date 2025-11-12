@@ -62,29 +62,23 @@ jobs:
             GRANT ALL PRIVILEGES ON subscriptions.* TO 'sub_user'@'%';
             FLUSH PRIVILEGES;"
 
-      - name: Download Flyway CLI
+      - name: Download Flyway CLI 11.17.0
         run: |
           set -e
-          curl -L https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/9.22.0/flyway-commandline-9.22.0-linux-x64.tar.gz | tar xz
+          curl -L https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/11.17.0/flyway-commandline-11.17.0-linux-x64.tar.gz | tar xz
 
       - name: Clean database and run Flyway migrations
         run: |
           set -e
-          # Drop & recreate database to avoid validation errors
+          # Drop & recreate database to start fresh
           mysql -h 127.0.0.1 -uroot -prootpass -e "DROP DATABASE IF EXISTS subscriptions; CREATE DATABASE subscriptions;"
 
-          # Run initial migrations
-          ./flyway-9.22.0/flyway \
+          # Run all migrations (initial + incremental) with auto-clean on validation error
+          ./flyway-11.17.0/flyway \
             -url="jdbc:mysql://127.0.0.1:3306/subscriptions?allowPublicKeyRetrieval=true&useSSL=false" \
             -user=sub_user -password=sub_pass \
-            -locations=filesystem:flyway/migrations_initial \
-            migrate
-
-          # Run incremental migrations
-          ./flyway-9.22.0/flyway \
-            -url="jdbc:mysql://127.0.0.1:3306/subscriptions?allowPublicKeyRetrieval=true&useSSL=false" \
-            -user=sub_user -password=sub_pass \
-            -locations=filesystem:flyway/migrations_incremental \
+            -locations=filesystem:flyway/migrations_initial,filesystem:flyway/migrations_incremental \
+            -cleanOnValidationError=true \
             migrate
 
       - name: Run Python tests
