@@ -5,7 +5,7 @@ This repository demonstrates automated database migration and testing using Flyw
 
 ## Assignment Requirements
 
-**Question 1:** Analysis and comparison of two database migration tools [text](Q1_Tools_Analysis.md) [text](Q1_Tools_Analysis.pdf).
+**Question 1:** Analysis and comparison of two database migration tools [Q1_Tools_Analysis.md](Q1_Tools_Analysis.md) or [Q1_Tools_Analysis.pdf](Q1_Tools_Analysis.pdf).
 
 **Question 2:**
 
