@@ -1,11 +1,10 @@
 ---
 - name: Tear down environment
   hosts: localhost
-  gather_facts: no
-
+  become: false
   tasks:
     - name: Stop and remove MySQL container
       community.docker.docker_container:
         name: a4-mysql
         state: absent
-        force_kill: yes
+        force_kill: true
