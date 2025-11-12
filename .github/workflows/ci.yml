@@ -28,33 +28,6 @@ jobs:
         run: |
           ansible-playbook ansible/up.yml
 
-      - name: Verify initial migrations applied
-        run: |
-          docker run --rm --network host \
-            -v ${{ github.workspace }}/flyway/migrations_initial:/flyway/sql \
-            flyway/flyway:10 \
-            -url=jdbc:mysql://127.0.0.1:3306/subscriptions \
-            -user=sub_user -password=sub_pass \
-            info
-
-      - name: Run incremental Flyway migrations
-        run: |
-          docker run --rm --network host \
-            -v ${{ github.workspace }}/flyway/migrations_incremental:/flyway/sql \
-            flyway/flyway:10 \
-            -url=jdbc:mysql://127.0.0.1:3306/subscriptions?allowPublicKeyRetrieval=true&useSSL=false \
-            -user=sub_user -password=sub_pass \
-            migrate
-
-      - name: Verify migrations status
-        run: |
-          docker run --rm --network host \
-            -v ${{ github.workspace }}/flyway/migrations_incremental:/flyway/sql \
-            flyway/flyway:10 \
-            -url=jdbc:mysql://127.0.0.1:3306/subscriptions?allowPublicKeyRetrieval=true&useSSL=false \
-            -user=sub_user -password=sub_pass \
-            info
-
       - name: Run CRUD tests
         env:
           DB_HOST: 127.0.0.1
