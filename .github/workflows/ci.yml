@@ -1,4 +1,4 @@
-name: Flyway Migration, Ansible and Test CI
+name: Flyway Migration, Python Test CI
 
 on:
   push:
@@ -20,10 +20,16 @@ jobs:
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -uroot -prootpass" 
-          --health-interval=5s 
-          --health-timeout=2s 
+          --health-cmd="mysqladmin ping -uroot -prootpass"
+          --health-interval=5s
+          --health-timeout=2s
           --health-retries=12
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USER: sub_user
+      DB_PASSWORD: sub_pass
+      DB_NAME: subscriptions
 
     steps:
       - name: Checkout repository
@@ -41,33 +47,46 @@ jobs:
 
       - name: Wait for MySQL to be ready
         run: |
+          set -e
           for i in {1..30}; do
             mysql -h 127.0.0.1 -uroot -prootpass -e "SELECT 1" && break
             echo "Waiting for MySQL..."
             sleep 2
           done
 
-      - name: Create test user for Flyway migrations
+      - name: Create non-root DB user for Flyway
         run: |
+          set -e
           mysql -h 127.0.0.1 -uroot -prootpass -e "
-          CREATE USER IF NOT EXISTS 'sub_user'@'%' IDENTIFIED BY 'sub_pass';
-          GRANT ALL PRIVILEGES ON subscriptions.* TO 'sub_user'@'%';
-          FLUSH PRIVILEGES;"
+            CREATE USER IF NOT EXISTS 'sub_user'@'%' IDENTIFIED BY 'sub_pass';
+            GRANT ALL PRIVILEGES ON subscriptions.* TO 'sub_user'@'%';
+            FLUSH PRIVILEGES;"
 
       - name: Download Flyway CLI
         run: |
+          set -e
           curl -L https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/9.22.0/flyway-commandline-9.22.0-linux-x64.tar.gz | tar xz
 
       - name: Run Flyway migrations
         run: |
-          ./flyway-9.22.0/flyway -url="jdbc:mysql://127.0.0.1:3306/subscribers?allowPublicKeyRetrieval=true&useSSL=false" -user=root -password=rootpass -locations=filesystem:flyway/migrations migrate
-          ./flyway-9.22.0/flyway -url="jdbc:mysql://127.0.0.1:3306/subscribers?allowPublicKeyRetrieval=true&useSSL=false" -user=root -password=rootpass -locations=filesystem:flyway/migrations_incremental migrate
+          set -e
+          # Initial migrations
+          ./flyway-9.22.0/flyway \
+            -url="jdbc:mysql://127.0.0.1:3306/subscriptions?allowPublicKeyRetrieval=true&useSSL=false" \
+            -user=sub_user -password=sub_pass \
+            -locations=filesystem:flyway/migrations_initial \
+            migrate
+          # Incremental migrations
+          ./flyway-9.22.0/flyway \
+            -url="jdbc:mysql://127.0.0.1:3306/subscriptions?allowPublicKeyRetrieval=true&useSSL=false" \
+            -user=sub_user -password=sub_pass \
+            -locations=filesystem:flyway/migrations_incremental \
+            migrate
 
       - name: Run Python tests
-        run: pytest -v test_subscribers.py
+        run: |
+          set -e
+          pytest -v test_subscribers.py
 
-      - name: Deployment complete
-        run: echo "Deployment and tests completed successfully!"
-
-      - name: Completion message
-        run: echo "CI pipeline completed for commit ${{ github.sha }}"
+      - name: CI Complete
+        run: echo "CI pipeline completed successfully for commit ${{ github.sha }}"
