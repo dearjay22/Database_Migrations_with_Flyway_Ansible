@@ -40,22 +40,25 @@ The GitHub Actions workflow (`flyway.yml`) performs the following steps:
 
 ```sh
 sudo ansible-playbook ansible/up.yml
-![ansible_Up](image.png)
 ```
+![ansible_Up](image.png)
+
 
 2. **Run Python unit tests:**
 
 ```sh
 pytest -v tests/test_subscribers.py
-![CRUD_Test](image-5.png)
 ```
+![CRUD_Test](image-5.png)
+
 
 3. **Tear down environment:**
 
 ```sh
 sudo ansible-playbook ansible/down.yml
-![ansible_down](image-2.png)
 ```
+![ansible_down](image-2.png)
+
 ---
 
 ## Troubleshooting
