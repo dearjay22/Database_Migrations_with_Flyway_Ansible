@@ -66,6 +66,8 @@ To integrate Flyway and Liquibase into a CI/CD pipeline:
    - Use environment variables for DB credentials
    - Store migration history and audit logs
 
+
+![alt text](image-7.png)
 ---
 
 ## References
