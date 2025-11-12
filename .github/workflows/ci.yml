@@ -67,16 +67,20 @@ jobs:
           set -e
           curl -L https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/9.22.0/flyway-commandline-9.22.0-linux-x64.tar.gz | tar xz
 
-      - name: Run Flyway migrations
+      - name: Clean database and run Flyway migrations
         run: |
           set -e
-          # Initial migrations
+          # Drop & recreate database to avoid validation errors
+          mysql -h 127.0.0.1 -uroot -prootpass -e "DROP DATABASE IF EXISTS subscriptions; CREATE DATABASE subscriptions;"
+
+          # Run initial migrations
           ./flyway-9.22.0/flyway \
             -url="jdbc:mysql://127.0.0.1:3306/subscriptions?allowPublicKeyRetrieval=true&useSSL=false" \
             -user=sub_user -password=sub_pass \
             -locations=filesystem:flyway/migrations_initial \
             migrate
-          # Incremental migrations
+
+          # Run incremental migrations
           ./flyway-9.22.0/flyway \
             -url="jdbc:mysql://127.0.0.1:3306/subscriptions?allowPublicKeyRetrieval=true&useSSL=false" \
             -user=sub_user -password=sub_pass \
