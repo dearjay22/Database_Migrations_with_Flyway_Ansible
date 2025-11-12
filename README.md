@@ -39,27 +39,22 @@ The GitHub Actions workflow (`flyway.yml`) performs the following steps:
 1. **Set up environment with Ansible:**
 
 ```sh
-ansible-playbook up.yml
-ansible-playbook db_setup.yml
+sudo ansible-playbook ansible/up.yml
+![ansible_Up](image.png)
 ```
 
-2. **Run Flyway migrations:**
+2. **Run Python unit tests:**
 
 ```sh
-./flyway-9.22.0/flyway -url="jdbc:mysql://localhost:3306/subscribers" -user=sub_user -password=subpass -locations=filesystem:flyway/migrations migrate
-./flyway-9.22.0/flyway -url="jdbc:mysql://localhost:3306/subscribers" -user=sub_user -password=subpass -locations=filesystem:flyway/migrations_incremental migrate
+pytest -v tests/test_subscribers.py
+![CRUD_Test](image-5.png)
 ```
 
-3. **Run Python unit tests:**
+3. **Tear down environment:**
 
 ```sh
-python3 -m unittest discover tests
-```
-
-4. **Tear down environment:**
-
-```sh
-ansible-playbook down.yml
+sudo ansible-playbook ansible/down.yml
+![ansible_down](image-2.png)
 ```
 ---
 
@@ -83,13 +78,10 @@ ansible-playbook down.yml
 ## Screenshots
 
 CI/CD Run:
-
-
-Docker Setup:
-
+![CI/CD_Run](image-3.png)
 
 Flyway Migration:
-
+![Flyway_Migration](image-4.png)
 
 Python Unit Tests:
 

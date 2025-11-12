@@ -1,6 +1,7 @@
 import os
 import uuid
 import pymysql
+import pytest
 
 DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
 DB_USER = os.getenv("DB_USER", "root")
@@ -19,33 +20,48 @@ def connect():
     )
 
 
-def test_create_read_update_delete():
-    """Test full CRUD lifecycle for a subscriber."""
+def test_create_subscriber():
     email = f"{uuid.uuid4()}@example.com"
     name = "Alice"
-
-    # CREATE
     with connect() as conn, conn.cursor() as cur:
-        cur.execute("INSERT INTO subscribers(email, name) VALUES(%s, %s)", (email, name))
+        cur.execute("INSERT INTO subscribers (email, name) VALUES (%s, %s)", (email, name))
         sub_id = cur.lastrowid
-        assert sub_id, "INSERT failed, no ID returned"
+        assert sub_id is not None
 
-    # READ
+
+def test_read_subscriber():
+    email = f"{uuid.uuid4()}@example.com"
+    name = "Bob"
     with connect() as conn, conn.cursor() as cur:
-        cur.execute("SELECT * FROM subscribers WHERE id=%s", (sub_id,))
+        cur.execute("INSERT INTO subscribers (email, name) VALUES (%s, %s)", (email, name))
+        sub_id = cur.lastrowid
+        cur.execute("SELECT * FROM subscribers WHERE id = %s", (sub_id,))
         row = cur.fetchone()
-        assert row, f"SELECT failed, no row found for id={sub_id}"
-        assert row["email"] == email, "Email does not match inserted value"
+        assert row is not None
+        assert row["email"] == email
+        assert row["name"] == name
 
-    # UPDATE
-    with connect() as conn, conn.cursor() as cur:
-        cur.execute("UPDATE subscribers SET name=%s WHERE id=%s", ("Alice Updated", sub_id))
-        cur.execute("SELECT name FROM subscribers WHERE id=%s", (sub_id,))
-        updated_name = cur.fetchone()["name"]
-        assert updated_name == "Alice Updated", f"UPDATE failed, name={updated_name}"
 
-    # DELETE
+def test_update_subscriber():
+    email = f"{uuid.uuid4()}@example.com"
+    name = "Charlie"
+    new_name = "Charlie Updated"
     with connect() as conn, conn.cursor() as cur:
-        cur.execute("DELETE FROM subscribers WHERE id=%s", (sub_id,))
-        cur.execute("SELECT COUNT(*) AS n FROM subscribers WHERE id=%s", (sub_id,))
-        assert cur.fetchone()["n"] == 0, "DELETE failed, record still exists"
+        cur.execute("INSERT INTO subscribers (email, name) VALUES (%s, %s)", (email, name))
+        sub_id = cur.lastrowid
+        cur.execute("UPDATE subscribers SET name = %s WHERE id = %s", (new_name, sub_id))
+        cur.execute("SELECT name FROM subscribers WHERE id = %s", (sub_id,))
+        row = cur.fetchone()
+        assert row["name"] == new_name
+
+
+def test_delete_subscriber():
+    email = f"{uuid.uuid4()}@example.com"
+    name = "Jay"
+    with connect() as conn, conn.cursor() as cur:
+        cur.execute("INSERT INTO subscribers (email, name) VALUES (%s, %s)", (email, name))
+        sub_id = cur.lastrowid
+        cur.execute("DELETE FROM subscribers WHERE id = %s", (sub_id,))
+        cur.execute("SELECT COUNT(*) AS n FROM subscribers WHERE id = %s", (sub_id,))
+        count = cur.fetchone()["n"]
+        assert count == 0
