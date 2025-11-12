@@ -1,10 +1,9 @@
 ---
-- name: Tear down environment
+- name: Tear down MySQL container
   hosts: localhost
   connection: local
-
   tasks:
     - name: Stop and remove MySQL container
-      shell: |
-        docker rm -f a4-mysql || true
+      ansible.builtin.shell: |
+        docker ps -q --filter "name=a4-mysql" | grep -q . && docker stop a4-mysql && docker rm a4-mysql || echo "Container not running"
       changed_when: false
