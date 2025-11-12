@@ -1,8 +1,8 @@
-
 ---
 - name: Assignment 4 - Tear environment down
   hosts: localhost
   connection: local
+
   tasks:
     - name: Stop and remove MySQL container
       ansible.builtin.shell: |

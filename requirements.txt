@@ -1,4 +1,2 @@
 pymysql
 pytest
-ansible
-docker
