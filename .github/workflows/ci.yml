@@ -79,13 +79,7 @@ jobs:
           ./flyway-9.22.0/flyway \
             -url="jdbc:mysql://127.0.0.1:3306/subscriptions?allowPublicKeyRetrieval=true&useSSL=false" \
             -user=sub_user -password=sub_pass \
-            -locations=filesystem:flyway/migrations_initial \
-            migrate
-            
-          ./flyway-9.22.0/flyway \
-            -url="jdbc:mysql://127.0.0.1:3306/subscriptions?allowPublicKeyRetrieval=true&useSSL=false" \
-            -user=sub_user -password=sub_pass \
-            -locations=filesystem:flyway/migrations_incremental \
+            -locations=filesystem:flyway/migrations_initial,filesystem:flyway/migrations_incremental \
             migrate
 
       - name: Run Python tests
