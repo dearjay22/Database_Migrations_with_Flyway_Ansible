@@ -5,7 +5,7 @@ This repository demonstrates automated database migration and testing using Flyw
 
 ## Assignment Requirements
 
-**Question 1:** Analysis and comparison of two database migration tools (see PDF submission).
+**Question 1:** Analysis and comparison of two database migration tools [text](Q1_Tools_Analysis.md) [text](Q1_Tools_Analysis.pdf).
 
 **Question 2:**
 
@@ -19,7 +19,7 @@ This repository demonstrates automated database migration and testing using Flyw
 
 ## CI/CD Pipeline Overview
 
-The GitHub Actions workflow (`flyway.yml`) performs the following steps:
+The GitHub Actions workflow (`ci.yml`) performs the following steps:
 
 
 1. Spins up a MySQL service
@@ -47,6 +47,7 @@ sudo ansible-playbook ansible/up.yml
 2. **Run Python unit tests:**
 
 ```sh
+pip install -r requirements.txt
 pytest -v tests/test_subscribers.py
 ```
 ![CRUD_Test](image-5.png)
