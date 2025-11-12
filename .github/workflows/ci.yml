@@ -7,7 +7,7 @@ on:
   pull_request:
 
 jobs:
-  test:
+  migrate-and-test:
     runs-on: ubuntu-latest
 
     # MySQL service provided by GitHub Actions
@@ -60,14 +60,14 @@ jobs:
           GRANT ALL PRIVILEGES ON subscriptions.* TO 'sub_user'@'%';
           FLUSH PRIVILEGES;"
 
+      - name: Download Flyway CLI
+        run: |
+          curl -L https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/9.22.0/flyway-commandline-9.22.0-linux-x64.tar.gz | tar xz
+
       - name: Run Flyway migrations
         run: |
-          docker run --rm --network host \
-            -v ${{ github.workspace }}/flyway:/flyway/sql \
-            flyway/flyway:10 \
-            -url=jdbc:mysql://127.0.0.1:3306/subscriptions \
-            -user=sub_user -password=sub_pass \
-            -locations=filesystem:/flyway/migrations_initial migrate
+          ./flyway-9.22.0/flyway -url="jdbc:mysql://127.0.0.1:3306/subscribers?allowPublicKeyRetrieval=true&useSSL=false" -user=root -password=Secret5555 -locations=filesystem:migrations migrate
+          ./flyway-9.22.0/flyway -url="jdbc:mysql://127.0.0.1:3306/subscribers?allowPublicKeyRetrieval=true&useSSL=false" -user=root -password=Secret5555 -locations=filesystem:migrations_incremental migrate
 
       - name: Run Python tests
         run: pytest -v test_subscribers.py
