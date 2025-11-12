@@ -28,7 +28,7 @@ jobs:
         run: ansible-playbook ansible/up.yml
 
       - name: Run Flyway migrations (initial + incremental)
-        run: ./ci_migrate.sh
+        run: bash ci_migrate.sh
 
       - name: Run CRUD tests
         env:
