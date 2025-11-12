@@ -84,7 +84,7 @@ jobs:
       - name: Run Python tests
         run: |
           set -e
-          pytest -v test_subscribers.py
+          pytest -v tests/
 
       - name: CI Complete
         run: echo "CI pipeline completed successfully for commit ${{ github.sha }}"
