@@ -1,53 +1,59 @@
 ---
 - name: Bring environment up and run Flyway migrations
   hosts: localhost
-  connection: local
-  gather_facts: false
-
+  gather_facts: yes
   vars:
     mysql_root_password: rootpass
-    mysql_container_name: a4-mysql
-    mysql_image: mysql:8.0
-    db_name: subscriptions
     db_user: sub_user
-    db_pass: sub_pass
+    db_password: sub_pass
+    db_name: subscriptions
+    mysql_container_name: a4-mysql
+    mysql_port: 3306
     flyway_image: flyway/flyway:10
     flyway_migrations_initial: ../flyway/migrations_initial
     flyway_migrations_incremental: ../flyway/migrations_incremental
 
   tasks:
-
     - name: Ensure MySQL container is running
       community.docker.docker_container:
         name: "{{ mysql_container_name }}"
-        image: "{{ mysql_image }}"
+        image: mysql:8.0
         state: started
-        restart_policy: unless-stopped
+        restart_policy: always
         env:
           MYSQL_ROOT_PASSWORD: "{{ mysql_root_password }}"
-          MYSQL_DATABASE: "{{ db_name }}"
-        ports:
-          - "3306:3306"
+        published_ports:
+          - "{{ mysql_port }}:3306"
 
     - name: Wait until MySQL is ready
       community.mysql.mysql_ping:
         login_user: root
         login_password: "{{ mysql_root_password }}"
-      register: mysql_ping
+        login_host: 127.0.0.1
+        login_port: "{{ mysql_port }}"
+      register: ping_result
       retries: 20
       delay: 3
-      until: mysql_ping.ping is defined and mysql_ping.ping
+      until: ping_result.ping == "pong"
 
     - name: Create DB user with privileges
       community.mysql.mysql_user:
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+        login_host: 127.0.0.1
         name: "{{ db_user }}"
-        password: "{{ db_pass }}"
+        password: "{{ db_password }}"
         priv: "{{ db_name }}.*:ALL"
         host: "%"
         state: present
+
+    - name: Create database if not exists
+      community.mysql.mysql_db:
         login_user: root
         login_password: "{{ mysql_root_password }}"
-        auth_plugin: mysql_native_password
+        login_host: 127.0.0.1
+        name: "{{ db_name }}"
+        state: present
 
     - name: Run initial Flyway migrations
       community.docker.docker_container:
@@ -55,16 +61,15 @@
         image: "{{ flyway_image }}"
         state: started
         command: >
-          -url=jdbc:mysql://127.0.0.1:3306/{{ db_name }}?allowPublicKeyRetrieval=true&useSSL=false
+          -url=jdbc:mysql://host.docker.internal:3306/{{ db_name }}?allowPublicKeyRetrieval=true&useSSL=false
           -user={{ db_user }}
-          -password={{ db_pass }}
+          -password={{ db_password }}
           -locations=filesystem:/flyway/sql
           migrate
         volumes:
           - "{{ flyway_migrations_initial }}:/flyway/sql"
+        remove: yes
         network_mode: host
-      register: flyway_initial_result
-      failed_when: flyway_initial_result.rc != 0
 
     - name: Run incremental Flyway migrations
       community.docker.docker_container:
@@ -72,13 +77,12 @@
         image: "{{ flyway_image }}"
         state: started
         command: >
-          -url=jdbc:mysql://127.0.0.1:3306/{{ db_name }}?allowPublicKeyRetrieval=true&useSSL=false
+          -url=jdbc:mysql://host.docker.internal:3306/{{ db_name }}?allowPublicKeyRetrieval=true&useSSL=false
           -user={{ db_user }}
-          -password={{ db_pass }}
+          -password={{ db_password }}
           -locations=filesystem:/flyway/sql
           migrate
         volumes:
           - "{{ flyway_migrations_incremental }}:/flyway/sql"
+        remove: yes
         network_mode: host
-      register: flyway_incremental_result
-      failed_when: flyway_incremental_result.rc != 0

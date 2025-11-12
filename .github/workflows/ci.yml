@@ -11,33 +11,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout the code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Set up Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # Install Ansible and required Python dependencies
-      - name: Install Ansible & dependencies
+      - name: Install Python packages
         run: |
           python -m pip install --upgrade pip
-          pip install ansible requests docker
+          pip install ansible requests docker mysql-connector-python
 
-      # Bring environment up using Ansible
-      - name: Bring environment up (Ansible up.yml)
+      - name: Install Ansible collections
+        run: |
+          ansible-galaxy collection install community.mysql
+          ansible-galaxy collection install community.docker
+
+      - name: Bring environment up (MySQL + Flyway migrations)
         run: ansible-playbook ansible/up.yml -e "ansible_python_interpreter=/usr/bin/python3"
 
-      # Install project Python dependencies
-      - name: Install project dependencies
-        run: |
-          pip install -r requirements.txt
-
-      # Run CRUD or integration tests
-      - name: Run tests
+      - name: Run CRUD tests
         env:
           DB_HOST: 127.0.0.1
           DB_USER: sub_user
@@ -47,11 +42,9 @@ jobs:
           sleep 5
           pytest -v tests/test_subscribers.py
 
-      # Tear down environment using Ansible
-      - name: Tear down environment (Ansible down.yml)
+      - name: Tear down environment
         if: always()
         run: ansible-playbook ansible/down.yml -e "ansible_python_interpreter=/usr/bin/python3"
 
-      # Completion message
       - name: Print completion message
         run: echo "CI pipeline completed for commit ${{ github.sha }}"
