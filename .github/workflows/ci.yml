@@ -10,7 +10,6 @@ jobs:
   migrate-and-test:
     runs-on: ubuntu-latest
 
-    # MySQL service provided by GitHub Actions
     services:
       mysql:
         image: mysql:8
@@ -65,12 +64,13 @@ jobs:
       - name: Download Flyway CLI 11.17.0
         run: |
           set -e
-          curl -L https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/11.17.0/flyway-commandline-11.17.0-linux-x64.tar.gz | tar xz
+          curl -L -o flyway.tar.gz https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/11.17.0/flyway-commandline-11.17.0-linux-x64.tar.gz
+          tar -xzf flyway.tar.gz
 
       - name: Clean database and run Flyway migrations
         run: |
           set -e
-          # Drop & recreate database to start fresh
+          # Drop & recreate database
           mysql -h 127.0.0.1 -uroot -prootpass -e "DROP DATABASE IF EXISTS subscriptions; CREATE DATABASE subscriptions;"
 
           # Run all migrations (initial + incremental) with auto-clean on validation error
