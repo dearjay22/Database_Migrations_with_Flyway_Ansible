@@ -2,14 +2,25 @@
 - name: Tear down environment
   hosts: localhost
   connection: local
+  gather_facts: false
+
+  vars:
+    mysql_container_name: a4-mysql
+    flyway_containers:
+      - flyway_initial
+      - flyway_incremental
 
   tasks:
-    - name: Stop MySQL container if running
-      ansible.builtin.shell: |
-        docker ps --filter "name=a4-mysql" --format "{{ '{{' }}.Names{{ '}}' }}" | grep -q a4-mysql && docker stop a4-mysql || echo "No container running"
-      changed_when: false
 
-    - name: Remove MySQL container if exists
-      ansible.builtin.shell: |
-        docker ps -a --filter "name=a4-mysql" --format "{{ '{{' }}.Names{{ '}}' }}" | grep -q a4-mysql && docker rm a4-mysql || echo "No container to remove"
-      changed_when: false
+    - name: Stop and remove Flyway containers
+      community.docker.docker_container:
+        name: "{{ item }}"
+        state: absent
+        force_kill: true
+      loop: "{{ flyway_containers }}"
+
+    - name: Stop and remove MySQL container
+      community.docker.docker_container:
+        name: "{{ mysql_container_name }}"
+        state: absent
+        force_kill: true

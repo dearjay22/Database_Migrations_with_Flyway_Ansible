@@ -1,69 +1,84 @@
 ---
 - name: Bring environment up and run Flyway migrations
   hosts: localhost
+  connection: local
   gather_facts: false
+
   vars:
+    mysql_root_password: rootpass
     mysql_container_name: a4-mysql
-    mysql_root_pass: rootpass
-    mysql_port: 3306
+    mysql_image: mysql:8.0
     db_name: subscriptions
     db_user: sub_user
     db_pass: sub_pass
-    flyway_initial_dir: "{{ playbook_dir }}/../flyway/migrations_initial"
-    flyway_incremental_dir: "{{ playbook_dir }}/../flyway/migrations_incremental"
+    flyway_image: flyway/flyway:10
+    flyway_migrations_initial: ../flyway/migrations_initial
+    flyway_migrations_incremental: ../flyway/migrations_incremental
 
   tasks:
 
     - name: Ensure MySQL container is running
       community.docker.docker_container:
         name: "{{ mysql_container_name }}"
-        image: mysql:8.0
+        image: "{{ mysql_image }}"
         state: started
         restart_policy: unless-stopped
         env:
-          MYSQL_ROOT_PASSWORD: "{{ mysql_root_pass }}"
+          MYSQL_ROOT_PASSWORD: "{{ mysql_root_password }}"
+          MYSQL_DATABASE: "{{ db_name }}"
         ports:
-          - "{{ mysql_port }}:3306"
+          - "3306:3306"
 
     - name: Wait until MySQL is ready
-      ansible.builtin.shell: |
-        until docker exec -i {{ mysql_container_name }} mysql -uroot -p{{ mysql_root_pass }} -e "SELECT 1;" >/dev/null 2>&1; do
-          echo "MySQL is not ready yet... waiting 3s"
-          sleep 3
-        done
-      changed_when: false
+      community.mysql.mysql_ping:
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+      register: mysql_ping
+      retries: 20
+      delay: 3
+      until: mysql_ping.ping is defined and mysql_ping.ping
 
     - name: Create DB user with privileges
-      ansible.builtin.shell: |
-        docker exec -i {{ mysql_container_name }} mysql -uroot -p{{ mysql_root_pass }} -e "
-          CREATE DATABASE IF NOT EXISTS {{ db_name }};
-          DROP USER IF EXISTS '{{ db_user }}'@'%';
-          CREATE USER '{{ db_user }}'@'%' IDENTIFIED WITH caching_sha2_password BY '{{ db_pass }}';
-          GRANT ALL PRIVILEGES ON {{ db_name }}.* TO '{{ db_user }}'@'%';
-          FLUSH PRIVILEGES;
-        "
-      changed_when: false
+      community.mysql.mysql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_pass }}"
+        priv: "{{ db_name }}.*:ALL"
+        host: "%"
+        state: present
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+        auth_plugin: mysql_native_password
 
     - name: Run initial Flyway migrations
-      ansible.builtin.shell: |
-        docker run --rm --network host \
-          -v "{{ flyway_initial_dir }}:/flyway/sql" \
-          flyway/flyway:10 \
-          "-url=jdbc:mysql://127.0.0.1:{{ mysql_port }}/{{ db_name }}?allowPublicKeyRetrieval=true&useSSL=false" \
-          "-user={{ db_user }}" \
-          "-password={{ db_pass }}" \
-          "-locations=filesystem:/flyway/sql" \
+      community.docker.docker_container:
+        name: flyway_initial
+        image: "{{ flyway_image }}"
+        state: started
+        command: >
+          -url=jdbc:mysql://127.0.0.1:3306/{{ db_name }}?allowPublicKeyRetrieval=true&useSSL=false
+          -user={{ db_user }}
+          -password={{ db_pass }}
+          -locations=filesystem:/flyway/sql
           migrate
-      changed_when: false
+        volumes:
+          - "{{ flyway_migrations_initial }}:/flyway/sql"
+        network_mode: host
+      register: flyway_initial_result
+      failed_when: flyway_initial_result.rc != 0
 
     - name: Run incremental Flyway migrations
-      ansible.builtin.shell: |
-        docker run --rm --network host \
-          -v "{{ flyway_incremental_dir }}:/flyway/sql" \
-          flyway/flyway:10 \
-          "-url=jdbc:mysql://127.0.0.1:{{ mysql_port }}/{{ db_name }}?allowPublicKeyRetrieval=true&useSSL=false" \
-          "-user={{ db_user }}" \
-          "-password={{ db_pass }}" \
-          "-locations=filesystem:/flyway/sql" \
+      community.docker.docker_container:
+        name: flyway_incremental
+        image: "{{ flyway_image }}"
+        state: started
+        command: >
+          -url=jdbc:mysql://127.0.0.1:3306/{{ db_name }}?allowPublicKeyRetrieval=true&useSSL=false
+          -user={{ db_user }}
+          -password={{ db_pass }}
+          -locations=filesystem:/flyway/sql
           migrate
-      changed_when: false
+        volumes:
+          - "{{ flyway_migrations_incremental }}:/flyway/sql"
+        network_mode: host
+      register: flyway_incremental_result
+      failed_when: flyway_incremental_result.rc != 0
