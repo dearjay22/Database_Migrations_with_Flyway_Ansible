@@ -25,12 +25,6 @@ jobs:
           --health-timeout=2s 
           --health-retries=12
 
-    env:
-      DB_HOST: 127.0.0.1
-      DB_USER: root
-      DB_PASSWORD: rootpass
-      DB_NAME: subscriptions
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -66,8 +60,8 @@ jobs:
 
       - name: Run Flyway migrations
         run: |
-          ./flyway-9.22.0/flyway -url="jdbc:mysql://127.0.0.1:3306/subscribers?allowPublicKeyRetrieval=true&useSSL=false" -user=root -password=Secret5555 -locations=filesystem:migrations migrate
-          ./flyway-9.22.0/flyway -url="jdbc:mysql://127.0.0.1:3306/subscribers?allowPublicKeyRetrieval=true&useSSL=false" -user=root -password=Secret5555 -locations=filesystem:migrations_incremental migrate
+          ./flyway-9.22.0/flyway -url="jdbc:mysql://127.0.0.1:3306/subscribers?allowPublicKeyRetrieval=true&useSSL=false" -user=root -password=rootpass -locations=filesystem:flyway/migrations migrate
+          ./flyway-9.22.0/flyway -url="jdbc:mysql://127.0.0.1:3306/subscribers?allowPublicKeyRetrieval=true&useSSL=false" -user=root -password=rootpass -locations=filesystem:flyway/migrations_incremental migrate
 
       - name: Run Python tests
         run: pytest -v test_subscribers.py
