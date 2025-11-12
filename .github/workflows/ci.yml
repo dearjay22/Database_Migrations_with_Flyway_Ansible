@@ -1,5 +1,4 @@
 name: Flyway Migration, Python Test CI
-
 on:
   push:
     branches:
@@ -67,18 +66,20 @@ jobs:
           curl -L -o flyway.tar.gz https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/9.22.0/flyway-commandline-9.22.0-linux-x64.tar.gz
           tar -xzf flyway.tar.gz
 
-      - name: Clean database and run Flyway migrations
+      - name: Repair Flyway schema and run migrations
         run: |
           set -e
-          # Drop & recreate database
-          mysql -h 127.0.0.1 -uroot -prootpass -e "DROP DATABASE IF EXISTS subscriptions; CREATE DATABASE subscriptions;"
+          # Repair schema history table if any migrations changed or removed
+          ./flyway-9.22.0/flyway \
+            -url="jdbc:mysql://127.0.0.1:3306/subscriptions?allowPublicKeyRetrieval=true&useSSL=false" \
+            -user=sub_user -password=sub_pass \
+            repair
 
-          # Run all migrations (initial + incremental) with auto-clean on validation error
+          # Run all pending migrations (initial + incremental)
           ./flyway-9.22.0/flyway \
             -url="jdbc:mysql://127.0.0.1:3306/subscriptions?allowPublicKeyRetrieval=true&useSSL=false" \
             -user=sub_user -password=sub_pass \
             -locations=filesystem:flyway/migrations_initial,filesystem:flyway/migrations_incremental \
-            -cleanOnValidationError=true \
             migrate
 
       - name: Run Python tests
