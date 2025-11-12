@@ -61,10 +61,10 @@ jobs:
             GRANT ALL PRIVILEGES ON subscriptions.* TO 'sub_user'@'%';
             FLUSH PRIVILEGES;"
 
-      - name: Download Flyway CLI 11.17.0
+      - name: Download Flyway CLI 9.22.0
         run: |
           set -e
-          curl -L -o flyway.tar.gz https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/11.17.0/flyway-commandline-11.17.0-linux-x64.tar.gz
+          curl -L -o flyway.tar.gz https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/9.22.0/flyway-commandline-9.22.0-linux-x64.tar.gz
           tar -xzf flyway.tar.gz
 
       - name: Clean database and run Flyway migrations
@@ -74,7 +74,7 @@ jobs:
           mysql -h 127.0.0.1 -uroot -prootpass -e "DROP DATABASE IF EXISTS subscriptions; CREATE DATABASE subscriptions;"
 
           # Run all migrations (initial + incremental) with auto-clean on validation error
-          ./flyway-11.17.0/flyway \
+          ./flyway-9.22.0/flyway \
             -url="jdbc:mysql://127.0.0.1:3306/subscriptions?allowPublicKeyRetrieval=true&useSSL=false" \
             -user=sub_user -password=sub_pass \
             -locations=filesystem:flyway/migrations_initial,filesystem:flyway/migrations_incremental \
