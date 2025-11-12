@@ -23,11 +23,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      - name: Install Ansible and required collections
-        run: |
-          pip install ansible
-          ansible-galaxy collection install community.mysql community.docker
+          pip install ansible docker community.docker
 
       - name: Bring environment up (Ansible up.yml)
         run: ansible-playbook ansible/up.yml -e "ansible_python_interpreter=/usr/bin/python3"
@@ -45,3 +41,6 @@ jobs:
       - name: Tear down environment (Ansible down.yml)
         if: always()
         run: ansible-playbook ansible/down.yml -e "ansible_python_interpreter=/usr/bin/python3"
+
+      - name: Print completion message
+        run: echo "CI pipeline completed for commit ${{ github.sha }}"
