@@ -1,65 +1,69 @@
 ---
 - name: Bring environment up and run Flyway migrations
   hosts: localhost
-  connection: local
+  gather_facts: false
   vars:
-    mysql_root_password: rootpass
+    mysql_container_name: a4-mysql
+    mysql_root_pass: rootpass
+    mysql_port: 3306
     db_name: subscriptions
     db_user: sub_user
     db_pass: sub_pass
-    mysql_port: 3306
     flyway_initial_dir: "{{ playbook_dir }}/../flyway/migrations_initial"
     flyway_incremental_dir: "{{ playbook_dir }}/../flyway/migrations_incremental"
 
   tasks:
+
     - name: Ensure MySQL container is running
-      ansible.builtin.shell: |
-        docker ps --filter "name=a4-mysql" --filter "status=running" --format "{{ '{{' }}.Names{{ '}}' }}" | grep -q a4-mysql \
-        || docker run -d --name a4-mysql \
-            -e MYSQL_ROOT_PASSWORD={{ mysql_root_password }} \
-            -e MYSQL_DATABASE={{ db_name }} \
-            -p {{ mysql_port }}:3306 \
-            mysql:8
-      changed_when: false
+      community.docker.docker_container:
+        name: "{{ mysql_container_name }}"
+        image: mysql:8.0
+        state: started
+        restart_policy: unless-stopped
+        env:
+          MYSQL_ROOT_PASSWORD: "{{ mysql_root_pass }}"
+        ports:
+          - "{{ mysql_port }}:3306"
 
     - name: Wait until MySQL is ready
       ansible.builtin.shell: |
-        until docker exec a4-mysql mysql -uroot -p{{ mysql_root_password }} -e "SELECT 1" >/dev/null 2>&1; do
+        until docker exec -i {{ mysql_container_name }} mysql -uroot -p{{ mysql_root_pass }} -e "SELECT 1;" >/dev/null 2>&1; do
           echo "MySQL is not ready yet... waiting 3s"
           sleep 3
         done
-        echo "MySQL is ready!"
       changed_when: false
 
     - name: Create DB user with privileges
       ansible.builtin.shell: |
-        docker exec -i a4-mysql mysql -uroot -p{{ mysql_root_password }} -e "
+        docker exec -i {{ mysql_container_name }} mysql -uroot -p{{ mysql_root_pass }} -e "
+          CREATE DATABASE IF NOT EXISTS {{ db_name }};
           DROP USER IF EXISTS '{{ db_user }}'@'%';
-          CREATE USER '{{ db_user }}'@'%' IDENTIFIED BY '{{ db_pass }}';
+          CREATE USER '{{ db_user }}'@'%' IDENTIFIED WITH caching_sha2_password BY '{{ db_pass }}';
           GRANT ALL PRIVILEGES ON {{ db_name }}.* TO '{{ db_user }}'@'%';
-          FLUSH PRIVILEGES;"
+          FLUSH PRIVILEGES;
+        "
       changed_when: false
 
     - name: Run initial Flyway migrations
       ansible.builtin.shell: |
         docker run --rm --network host \
-          -v {{ flyway_initial_dir }}:/flyway/sql \
+          -v "{{ flyway_initial_dir }}:/flyway/sql" \
           flyway/flyway:10 \
-          -url=jdbc:mysql://127.0.0.1:{{ mysql_port }}/{{ db_name }}?allowPublicKeyRetrieval=true&useSSL=false \
-          -user={{ db_user }} \
-          -password={{ db_pass }} \
-          -locations=filesystem:/flyway/sql \
+          "-url=jdbc:mysql://127.0.0.1:{{ mysql_port }}/{{ db_name }}?allowPublicKeyRetrieval=true&useSSL=false" \
+          "-user={{ db_user }}" \
+          "-password={{ db_pass }}" \
+          "-locations=filesystem:/flyway/sql" \
           migrate
       changed_when: false
 
     - name: Run incremental Flyway migrations
       ansible.builtin.shell: |
         docker run --rm --network host \
-          -v {{ flyway_incremental_dir }}:/flyway/sql \
+          -v "{{ flyway_incremental_dir }}:/flyway/sql" \
           flyway/flyway:10 \
-          -url=jdbc:mysql://127.0.0.1:{{ mysql_port }}/{{ db_name }}?allowPublicKeyRetrieval=true&useSSL=false \
-          -user={{ db_user }} \
-          -password={{ db_pass }} \
-          -locations=filesystem:/flyway/sql \
+          "-url=jdbc:mysql://127.0.0.1:{{ mysql_port }}/{{ db_name }}?allowPublicKeyRetrieval=true&useSSL=false" \
+          "-user={{ db_user }}" \
+          "-password={{ db_pass }}" \
+          "-locations=filesystem:/flyway/sql" \
           migrate
       changed_when: false
