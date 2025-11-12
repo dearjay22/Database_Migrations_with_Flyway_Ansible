@@ -1,5 +1,5 @@
 ---
-- name: Bring environment up
+- name: Bring environment up and run Flyway migrations
   hosts: localhost
   connection: local
   vars:
@@ -8,22 +8,44 @@
     db_user: sub_user
     db_pass: sub_pass
     mysql_port: 3306
-    mysql_container_name: a4-mysql
 
   tasks:
     - name: Ensure MySQL container is running
-      ansible.builtin.shell: |
-        docker ps --filter "name={{ mysql_container_name }}" --filter "status=running" --format "{{ '{{' }}.Names{{ '}}' }}" | grep -q {{ mysql_container_name }} \
-        || docker run -d --name {{ mysql_container_name }} \
-           -e MYSQL_ROOT_PASSWORD={{ mysql_root_password }} \
-           -e MYSQL_DATABASE={{ db_name }} \
-           -p {{ mysql_port }}:3306 \
-           mysql:8
+      shell: |
+        docker ps --filter "name=a4-mysql" --filter "status=running" --format "{{ '{{' }}.Names{{ '}}' }}" | grep -q a4-mysql \
+        || docker run -d --name a4-mysql \
+            -e MYSQL_ROOT_PASSWORD={{ mysql_root_password }} \
+            -e MYSQL_DATABASE={{ db_name }} \
+            -p {{ mysql_port }}:3306 \
+            mysql:8
       changed_when: false
 
-    - name: Wait until MySQL is ready
-      ansible.builtin.shell: |
-        until docker exec {{ mysql_container_name }} mysqladmin ping -h "localhost" -p{{ mysql_root_password }} --silent; do
-          sleep 3
+    - name: Wait until MySQL root is ready
+      shell: |
+        until docker exec a4-mysql mysql -uroot -p{{ mysql_root_password }} -e "SELECT 1" >/dev/null 2>&1; do
+          sleep 2
         done
       changed_when: false
+
+    - name: Create DB user with privileges
+      shell: |
+        docker exec -i a4-mysql mysql -uroot -p{{ mysql_root_password }} -e "
+        DROP USER IF EXISTS '{{ db_user }}'@'%';
+        CREATE USER '{{ db_user }}'@'%' IDENTIFIED BY '{{ db_pass }}';
+        GRANT ALL PRIVILEGES ON {{ db_name }}.* TO '{{ db_user }}'@'%';
+        FLUSH PRIVILEGES;"
+      changed_when: false
+
+    - name: Run initial Flyway migrations
+      shell: |
+        docker run --rm -v {{ playbook_dir }}/../flyway/migrations_initial:/flyway/sql --network host flyway/flyway:10 \
+        -url=jdbc:mysql://127.0.0.1:{{ mysql_port }}/{{ db_name }} \
+        -user={{ db_user }} -password={{ db_pass }} \
+        -locations=filesystem:/flyway/sql migrate
+
+    - name: Run incremental Flyway migrations
+      shell: |
+        docker run --rm -v {{ playbook_dir }}/../flyway/migrations_incremental:/flyway/sql --network host flyway/flyway:10 \
+        -url=jdbc:mysql://127.0.0.1:{{ mysql_port }}/{{ db_name }} \
+        -user={{ db_user }} -password={{ db_pass }} \
+        -locations=filesystem:/flyway/sql migrate

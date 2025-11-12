@@ -29,13 +29,7 @@ jobs:
 
       - name: Bring environment up (Ansible up.yml)
         run: ansible-playbook ansible/up.yml
-
-      - name: Make migration script executable
-        run: chmod +x ./ci_migrate.sh
-
-      - name: Run CI migrations script
-        run: ./ci_migrate.sh
-
+    
       - name: Run CRUD tests
         env:
           DB_HOST: 127.0.0.1
