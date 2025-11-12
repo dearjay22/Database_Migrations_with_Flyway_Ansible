@@ -1,5 +1,5 @@
 ---
-- name: Assignment 4 - Tear environment down
+- name: Assignment 4 - Tear down MySQL
   hosts: localhost
   connection: local
 

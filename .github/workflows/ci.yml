@@ -24,8 +24,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Bring environment up (Ansible up.yml)
+      - name: Bring environment up (MySQL)
         run: ansible-playbook ansible/up.yml
+
+      - name: Run Flyway migrations (initial + incremental)
+        run: ./ci_migrate.sh
 
       - name: Run CRUD tests
         env:
@@ -37,9 +40,9 @@ jobs:
           sleep 5
           pytest -v tests/test_subscribers.py
 
-      - name: Tear down environment (Ansible down.yml)
+      - name: Tear down environment
         if: always()
         run: ansible-playbook ansible/down.yml
 
-      - name: Print completion message
+      - name: Completion message
         run: echo "CI pipeline completed for commit ${{ github.sha }}"
