@@ -27,16 +27,20 @@ jobs:
       - name: Bring environment up (Ansible up.yml)
         run: ansible-playbook ansible/up.yml
 
-      - name: Run Flyway migrations
-        run: bash ci_migrate.sh
+      - name: Make migration script executable
+        run: chmod +x ./ci_migrate.sh
+
+      - name: Run CI migrations script
+        run: ./ci_migrate.sh
 
       - name: Run CRUD tests
         env:
           DB_HOST: 127.0.0.1
-          DB_USER: root
-          DB_PASSWORD: rootpass
+          DB_USER: sub_user
+          DB_PASSWORD: sub_pass
           DB_NAME: subscriptions
         run: |
+          # Wait a moment for everything to settle
           sleep 5
           pytest -v tests/test_subscribers.py
 

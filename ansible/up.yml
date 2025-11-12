@@ -1,28 +1,29 @@
 ---
-- name: Assignment 4 - Bring MySQL up
+- name: Bring environment up
   hosts: localhost
   connection: local
   vars:
     mysql_root_password: rootpass
     db_name: subscriptions
+    db_user: sub_user
+    db_pass: sub_pass
     mysql_port: 3306
+    mysql_container_name: a4-mysql
 
   tasks:
     - name: Ensure MySQL container is running
       ansible.builtin.shell: |
-        docker ps --filter "name=a4-mysql" --filter "status=running" --format "{{ '{{' }}.Names{{ '}}' }}" | grep -q a4-mysql \
-        || docker run -d --name a4-mysql \
-            -e MYSQL_ROOT_PASSWORD={{ mysql_root_password }} \
-            -e MYSQL_DATABASE={{ db_name }} \
-            -p {{ mysql_port }}:3306 \
-            mysql:8
+        docker ps --filter "name={{ mysql_container_name }}" --filter "status=running" --format "{{ '{{' }}.Names{{ '}}' }}" | grep -q {{ mysql_container_name }} \
+        || docker run -d --name {{ mysql_container_name }} \
+           -e MYSQL_ROOT_PASSWORD={{ mysql_root_password }} \
+           -e MYSQL_DATABASE={{ db_name }} \
+           -p {{ mysql_port }}:3306 \
+           mysql:8
       changed_when: false
 
     - name: Wait until MySQL is ready
       ansible.builtin.shell: |
-        echo "Waiting for MySQL container to become ready..."
-        until docker exec a4-mysql mysqladmin ping -h "127.0.0.1" -p{{ mysql_root_password }} --silent; do
+        until docker exec {{ mysql_container_name }} mysqladmin ping -h "localhost" -p{{ mysql_root_password }} --silent; do
           sleep 3
         done
-        echo "MySQL is ready!"
       changed_when: false
